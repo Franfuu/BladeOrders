@@ -1,59 +1,120 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# BladeOrders: Sistema de Gestión de Pedidos
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**BladeOrders** es una aplicación web desarrollada en Laravel diseñada para centralizar la gestión de clientes y sus respectivos pedidos, permitiendo un control total sobre el flujo de ventas de un pequeño negocio.
 
-## About Laravel
+# Cosas aprendidas:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Día 1
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### El atajo "-mcr": Creando todo de un golpe
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**¿Para qué sirve?**: Con este añadido al final del comando, Laravel te construye la estructura básica de una sección de tu web de un solo golpe. Te crea tres archivos clave:
 
-## Learning Laravel
+* **La M (Migración):** El plano para crear la tabla en la base de datos.
+* **La C (Controlador):** El "cerebro" que recibe las peticiones de los usuarios.
+* **La R (Recurso):** Hace que ese controlador ya venga con los métodos estándar para ver, crear, editar y borrar (el famoso CRUD) ya escritos, para que no tengas que crearlos tú uno a uno.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+**Uso real**: Se utiliza para **ahorrar tiempo y evitar errores de nombres**.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+# Diario de Trabajo: Día 1
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Creación del proyecto
 
-### Premium Partners
+Primero creamos el proyecto y entramos a él con los comandos:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```shell
+composer create-project laravel/laravel BladeOrders
+cd BladeOrders
+```
 
-## Contributing
+## Creación del modelo, Migración y Controladores
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Luego creamos el modelo, migraciones y controladores.
 
-## Code of Conduct
+```shell
+php artisan make:model Client -mcr
+php artisan make:model Order -mcr
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+> **Nota:**
+>
+> `-mcr` crea el Modelo, La Migración y el Controlador con los métodos CRUD ya definidos
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Migraciones (Database)
 
-## License
+### create_clients_table
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Esta tabla almacena la información básica de los clientes que realizarán pedidos.
+
+* **`id()`**: Crea un campo autoincremental como clave primaria.
+* **`nombre`**: Campo de texto estándar para el nombre del cliente.
+* **`email`**: Se marca como `unique()` para evitar que dos clientes se registren con el mismo correo.
+* **`telefono` y `direccion`**: Campos opcionales (`nullable()`) para información de contacto.
+* **`timestamps()`**: Crea automáticamente las columnas `created_at` y `updated_at`.
+
+```php
+public function up(): void
+{
+    Schema::create('clients', function (Blueprint $table) {
+        $table->id();
+        $table->string('nombre');
+        $table->string('email')->unique();
+        $table->string('telefono')->nullable();
+        $table->string('direccion')->nullable();
+        $table->timestamps();
+    });
+}
+```
+
+### create_orders_table
+
+Esta tabla gestiona los pedidos y vincula cada compra con un cliente específico.
+
+* **`foreignId('client_id')`**: Es la pieza clave de la relación. Conecta el pedido con un ID de la tabla `clients`.
+* **`constrained()`**: Asegura que el cliente realmente exista.
+* **`onDelete('cascade')`**: Si un cliente es eliminado de la base de datos, todos sus pedidos se borrarán automáticamente para no dejar datos huérfanos.
+* **`numero_pedido`**: Un identificador único para seguimiento comercial (diferente al ID interno).
+* **`fecha`**: Registra el momento exacto de la venta.
+* **`estado`**: Utiliza un `enum`, lo que restringe los valores posibles a solo cuatro opciones específicas (`pendiente`, `enviado`, `entregado`, `cancelado`), garantizando la integridad de los datos.
+* **`total`**: Definido como `decimal(10, 2)` para manejar dinero con precisión (evitando los errores de redondeo de los tipos *float*).
+
+```php
+public function up(): void
+{
+    Schema::create('orders', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('client_id')->constrained()->onDelete('cascade');
+        $table->string('numero_pedido')->unique();
+        $table->date('fecha');
+        $table->enum('estado', ['pendiente', 'enviado', 'entregado', 'cancelado'])->default('pendiente');
+        $table->decimal('total', 10, 2);
+        $table->timestamps();
+    });
+}
+```
+
+---
+
+## Estructura de archivos creados
+
+Tras ejecutar los comandos del día 1, se generaron los siguientes archivos:
+
+```
+app/
+├── Http/
+│   └── Controllers/
+│       ├── ClientController.php    # Controlador CRUD para clientes
+│       └── OrderController.php     # Controlador CRUD para pedidos
+└── Models/
+    ├── Client.php                  # Modelo de Cliente
+    └── Order.php                   # Modelo de Pedido
+
+database/
+└── migrations/
+    ├── 2026_01_25_193533_create_clients_table.php
+    └── 2026_01_25_193546_create_orders_table.php
+```
