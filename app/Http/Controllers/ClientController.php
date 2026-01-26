@@ -42,4 +42,32 @@ class ClientController extends Controller
         $client->load('orders'); 
         return view('clients.show', compact('client'));
     }
+
+    // Mostrar el formulario de edición
+    public function edit(Client $client)
+    {
+        return view('clients.edit', compact('client'));
+    }
+
+    // Actualizar un cliente existente
+    public function update(Request $request, Client $client)
+    {
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'email' => 'required|email|unique:clients,email,' . $client->id,
+            'telefono' => 'nullable',
+            'direccion' => 'nullable',
+        ]);
+
+        $client->update($validated);
+
+        return redirect()->route('clients.index')->with('success', 'Cliente actualizado con éxito.');
+    }
+
+    // Eliminar un cliente
+    public function destroy(Client $client)
+    {
+        $client->delete();
+        return redirect()->route('clients.index')->with('success', 'Cliente eliminado con éxito.');
+    }
 }

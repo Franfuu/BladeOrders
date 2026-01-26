@@ -19,7 +19,7 @@ return new class extends Migration
             $table->date('fecha');
             // Requisito: Estados permitidos
             $table->enum('estado', ['pendiente', 'enviado', 'entregado', 'cancelado'])->default('pendiente');
-            $table->decimal('total', 10, 2);
+            $table->decimal('total', 10, 2); // Requisito: Total del pedido
             $table->timestamps();
         });
     }
