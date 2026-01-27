@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class ClientFactory extends Factory
 {
-   public function definition(): array
-{
-    return [
-        'nombre' => fake()->name(),
-        'email' => fake()->unique()->safeEmail(),
-        'telefono' => fake()->phoneNumber(),
-        'direccion' => fake()->address()
-    ];
-}
+    public function definition(): array
+    {
+        return [
+            'nombre'    => $this->faker->name(),
+            'email'     => $this->faker->unique()->safeEmail(),
+            'telefono'  => $this->faker->phoneNumber(),
+            'direccion' => $this->faker->address()
+        ];
+    }
 }
