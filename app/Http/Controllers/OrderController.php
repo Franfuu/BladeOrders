@@ -35,4 +35,34 @@ class OrderController extends Controller
 
         return redirect()->route('orders.index')->with('success', 'Pedido registrado.');
     }
+
+    // Mostrar el formulario de edición
+    public function edit(Order $order)
+    {
+        $clients = Client::all();
+        return view('orders.edit', compact('order', 'clients'));
+    }
+
+    // Actualizar un pedido existente
+    public function update(Request $request, Order $order)
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'numero_pedido' => 'required|unique:orders,numero_pedido,' . $order->id,
+            'fecha' => 'required|date',
+            'estado' => 'required|in:pendiente,enviado,entregado,cancelado',
+            'total' => 'required|numeric|min:0',
+        ]);
+
+        $order->update($validated);
+
+        return redirect()->route('orders.index')->with('success', 'Pedido actualizado con éxito.');
+    }
+
+    // Eliminar un pedido
+    public function destroy(Order $order)
+    {
+        $order->delete();
+        return redirect()->route('orders.index')->with('success', 'Pedido eliminado con éxito.');
+    }
 }

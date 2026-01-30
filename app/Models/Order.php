@@ -10,11 +10,15 @@ class Order extends Model
     use HasFactory;
 
     protected $fillable = [
-        'client_id', 
-        'numero_pedido', 
-        'fecha', 
-        'estado', 
+        'client_id',
+        'numero_pedido',
+        'fecha',
+        'estado',
         'total'
+    ];
+
+    protected $casts = [
+        'fecha' => 'date',
     ];
 
     /**

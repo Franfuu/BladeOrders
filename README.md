@@ -1,120 +1,490 @@
 # BladeOrders: Sistema de Gestión de Pedidos
 
-**BladeOrders** es una aplicación web desarrollada en Laravel diseñada para centralizar la gestión de clientes y sus respectivos pedidos, permitiendo un control total sobre el flujo de ventas de un pequeño negocio.
+**BladeOrders** es una aplicación web CRUD desarrollada en Laravel para gestionar clientes y sus pedidos, con relaciones 1:N entre entidades.
 
-# Cosas aprendidas:
+## Inicio Rápido
 
-## Día 1
+```shell
+# 1. Instalar dependencias
+composer install
 
-### El atajo "-mcr": Creando todo de un golpe
+# 2. Configurar base de datos (copiar .env.example a .env si es necesario)
+cp .env.example .env
 
-**¿Para qué sirve?**: Con este añadido al final del comando, Laravel te construye la estructura básica de una sección de tu web de un solo golpe. Te crea tres archivos clave:
+# 3. Crear tablas y poblar con datos de prueba
+php artisan migrate:fresh --seed
 
-* **La M (Migración):** El plano para crear la tabla en la base de datos.
-* **La C (Controlador):** El "cerebro" que recibe las peticiones de los usuarios.
-* **La R (Recurso):** Hace que ese controlador ya venga con los métodos estándar para ver, crear, editar y borrar (el famoso CRUD) ya escritos, para que no tengas que crearlos tú uno a uno.
+# 4. Iniciar servidor
+php artisan serve
+```
 
-**Uso real**: Se utiliza para **ahorrar tiempo y evitar errores de nombres**.
+> Acceder a: **http://127.0.0.1:8000**
 
 ---
 
-# Diario de Trabajo: Día 1
+## Estructura del Proyecto
 
-## Creación del proyecto
-
-Primero creamos el proyecto y entramos a él con los comandos:
-
-```shell
-composer create-project laravel/laravel BladeOrders
-cd BladeOrders
+```
+BladeOrders/
+├── app/
+│   ├── Http/Controllers/
+│   │   ├── ClientController.php      # CRUD de clientes
+│   │   └── OrderController.php       # CRUD de pedidos
+│   └── Models/
+│       ├── Client.php                # Modelo Cliente (hasMany)
+│       └── Order.php                 # Modelo Pedido (belongsTo)
+│
+├── database/
+│   ├── factories/
+│   │   ├── ClientFactory.php         # Genera clientes falsos
+│   │   └── OrderFactory.php          # Genera pedidos falsos
+│   ├── migrations/
+│   │   ├── create_clients_table.php
+│   │   ├── create_orders_table.php
+│   │   └── create_sessions_table.php
+│   └── seeders/
+│       └── DatabaseSeeder.php        # Pobla la BD
+│
+├── resources/views/
+│   ├── layouts/
+│   │   └── app.blade.php             # Layout principal
+│   ├── clients/
+│   │   ├── index.blade.php           # Lista clientes
+│   │   ├── create.blade.php          # Crear cliente
+│   │   ├── edit.blade.php            # Editar cliente
+│   │   └── show.blade.php            # Ver cliente + pedidos
+│   └── orders/
+│       ├── index.blade.php           # Lista pedidos
+│       ├── create.blade.php          # Crear pedido
+│       └── edit.blade.php            # Editar pedido
+│
+├── routes/
+│   └── web.php                       # Rutas de la aplicación
+└── .env                              # Configuración de entorno
 ```
 
-## Creación del modelo, Migración y Controladores
+---
 
-Luego creamos el modelo, migraciones y controladores.
+# Diario de Aprendizaje
+
+## Día 1: Creación del Proyecto
+
+### Comando `-mcr`: Crear estructura de un golpe
 
 ```shell
 php artisan make:model Client -mcr
 php artisan make:model Order -mcr
 ```
 
-> **Nota:**
->
-> `-mcr` crea el Modelo, La Migración y el Controlador con los métodos CRUD ya definidos
+| Flag   | Crea                            |
+| ------ | ------------------------------- |
+| `-m` | Migración (tabla en BD)        |
+| `-c` | Controlador                     |
+| `-r` | Métodos CRUD en el controlador |
+
+### Migraciones
+
+Las migraciones son el "control de versiones" de la base de datos.
+
+**create_clients_table.php**
+
+```php
+Schema::create('clients', function (Blueprint $table) {
+    $table->id();
+    $table->string('nombre');
+    $table->string('email')->unique();
+    $table->string('telefono')->nullable();
+    $table->string('direccion')->nullable();
+    $table->timestamps();
+});
+```
+
+**create_orders_table.php**
+
+```php
+Schema::create('orders', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('client_id')->constrained()->onDelete('cascade');
+    $table->string('numero_pedido')->unique();
+    $table->date('fecha');
+    $table->enum('estado', ['pendiente', 'enviado', 'entregado', 'cancelado'])->default('pendiente');
+    $table->decimal('total', 10, 2);
+    $table->timestamps();
+});
+```
+
+**Conceptos clave:**
+
+| Elemento                   | Descripción                                    |
+| -------------------------- | ----------------------------------------------- |
+| `foreignId('client_id')` | Clave foránea que conecta con clients          |
+| `constrained()`          | Verifica que el cliente exista                  |
+| `onDelete('cascade')`    | Si se borra el cliente, se borran sus pedidos   |
+| `enum()`                 | Restringe valores a opciones específicas       |
+| `decimal(10, 2)`         | Precisión para dinero (evita errores de float) |
 
 ---
 
-## Migraciones (Database)
+## Día 2: Factories, Seeders y Vistas de Edición
 
-### create_clients_table
+### Factories: Generando datos falsos
 
-Esta tabla almacena la información básica de los clientes que realizarán pedidos.
+Los Factories usan **Faker** para crear datos de prueba realistas.
 
-* **`id()`**: Crea un campo autoincremental como clave primaria.
-* **`nombre`**: Campo de texto estándar para el nombre del cliente.
-* **`email`**: Se marca como `unique()` para evitar que dos clientes se registren con el mismo correo.
-* **`telefono` y `direccion`**: Campos opcionales (`nullable()`) para información de contacto.
-* **`timestamps()`**: Crea automáticamente las columnas `created_at` y `updated_at`.
+**ClientFactory.php**
 
 ```php
-public function up(): void
+public function definition(): array
 {
-    Schema::create('clients', function (Blueprint $table) {
-        $table->id();
-        $table->string('nombre');
-        $table->string('email')->unique();
-        $table->string('telefono')->nullable();
-        $table->string('direccion')->nullable();
-        $table->timestamps();
+    return [
+        'nombre'    => $this->faker->name(),
+        'email'     => $this->faker->unique()->safeEmail(),
+        'telefono'  => $this->faker->phoneNumber(),
+        'direccion' => $this->faker->address()
+    ];
+}
+```
+
+**OrderFactory.php**
+
+```php
+public function definition(): array
+{
+    return [
+        'client_id'     => Client::factory(),
+        'numero_pedido' => 'PED-' . $this->faker->unique()->numberBetween(1000, 9999),
+        'fecha'         => $this->faker->dateTimeBetween('-1 year', 'now'),
+        'estado'        => $this->faker->randomElement(['pendiente', 'enviado', 'entregado', 'cancelado']),
+        'total'         => $this->faker->randomFloat(2, 10, 500)
+    ];
+}
+```
+
+### Métodos de Faker más usados
+
+| Método                                             | Ejemplo            |
+| --------------------------------------------------- | ------------------ |
+| `$this->faker->name()`                            | "Juan García"     |
+| `$this->faker->unique()->safeEmail()`             | "juan@example.com" |
+| `$this->faker->phoneNumber()`                     | "+34 612 345 678"  |
+| `$this->faker->address()`                         | "Calle Mayor 5"    |
+| `$this->faker->numberBetween(1, 100)`             | 42                 |
+| `$this->faker->randomFloat(2, 10, 500)`           | 123.45             |
+| `$this->faker->randomElement(['a','b'])`          | "b"                |
+| `$this->faker->dateTimeBetween('-1 year', 'now')` | "2025-06-15"       |
+
+### DatabaseSeeder
+
+```php
+public function run(): void
+{
+    // Crear 10 clientes
+    $clients = Client::factory(10)->create();
+
+    // Crear 2-5 pedidos por cliente
+    $clients->each(function ($client) {
+        Order::factory(rand(2, 5))->create([
+            'client_id' => $client->id
+        ]);
     });
 }
 ```
 
-### create_orders_table
+### Problemas resueltos
 
-Esta tabla gestiona los pedidos y vincula cada compra con un cliente específico.
+| Error                     | Causa                               | Solución                                            |
+| ------------------------- | ----------------------------------- | ---------------------------------------------------- |
+| "no such table: clients"  | Migraciones no ejecutadas           | `php artisan migrate:fresh`                        |
+| "no such table: sessions" | Laravel usa sesiones en BD          | `php artisan session:table && php artisan migrate` |
+| "No such file: User.php"  | DatabaseSeeder usa User por defecto | Modificar seeder para usar Client/Order              |
 
-* **`foreignId('client_id')`**: Es la pieza clave de la relación. Conecta el pedido con un ID de la tabla `clients`.
-* **`constrained()`**: Asegura que el cliente realmente exista.
-* **`onDelete('cascade')`**: Si un cliente es eliminado de la base de datos, todos sus pedidos se borrarán automáticamente para no dejar datos huérfanos.
-* **`numero_pedido`**: Un identificador único para seguimiento comercial (diferente al ID interno).
-* **`fecha`**: Registra el momento exacto de la venta.
-* **`estado`**: Utiliza un `enum`, lo que restringe los valores posibles a solo cuatro opciones específicas (`pendiente`, `enviado`, `entregado`, `cancelado`), garantizando la integridad de los datos.
-* **`total`**: Definido como `decimal(10, 2)` para manejar dinero con precisión (evitando los errores de redondeo de los tipos *float*).
+---
+
+## Día 3: Arquitectura MVC
+
+### Flujo de una petición
+
+```
+Navegador → Rutas → Controlador → Modelo ↔ BD
+                        ↓
+                      Vista → HTML → Navegador
+```
+
+### Modelos (app/Models/)
+
+Representan tablas y definen relaciones.
+
+**Client.php**
 
 ```php
-public function up(): void
+class Client extends Model
 {
-    Schema::create('orders', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('client_id')->constrained()->onDelete('cascade');
-        $table->string('numero_pedido')->unique();
-        $table->date('fecha');
-        $table->enum('estado', ['pendiente', 'enviado', 'entregado', 'cancelado'])->default('pendiente');
-        $table->decimal('total', 10, 2);
-        $table->timestamps();
-    });
+    use HasFactory;
+
+    protected $fillable = ['nombre', 'email', 'telefono', 'direccion'];
+
+    // Un cliente tiene muchos pedidos
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
 }
+```
+
+**Order.php**
+
+```php
+class Order extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['client_id', 'numero_pedido', 'fecha', 'estado', 'total'];
+
+    protected $casts = ['fecha' => 'date'];
+
+    // Un pedido pertenece a un cliente
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
+    }
+}
+```
+
+| Elemento        | Descripción                                       |
+| --------------- | -------------------------------------------------- |
+| `$fillable`   | Campos permitidos para asignación masiva          |
+| `$casts`      | Convierte automáticamente tipos (fecha → Carbon) |
+| `hasMany()`   | Relación 1:N (cliente → pedidos)                 |
+| `belongsTo()` | Relación inversa N:1 (pedido → cliente)          |
+
+### Controladores (app/Http/Controllers/)
+
+Contienen la lógica de negocio.
+
+**ClientController.php**
+
+```php
+class ClientController extends Controller
+{
+    public function index()
+    {
+        $clients = Client::all();
+        return view('clients.index', compact('clients'));
+    }
+
+    public function create()
+    {
+        return view('clients.create');
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'email' => 'required|email|unique:clients,email',
+            'telefono' => 'nullable',
+            'direccion' => 'nullable',
+        ]);
+
+        Client::create($validated);
+        return redirect()->route('clients.index')->with('success', 'Cliente creado con éxito.');
+    }
+
+    public function show(Client $client)
+    {
+        $client->load('orders'); // Carga los pedidos del cliente
+        return view('clients.show', compact('client'));
+    }
+
+    public function edit(Client $client)
+    {
+        return view('clients.edit', compact('client'));
+    }
+
+    public function update(Request $request, Client $client)
+    {
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'email' => 'required|email|unique:clients,email,' . $client->id,
+            'telefono' => 'nullable',
+            'direccion' => 'nullable',
+        ]);
+
+        $client->update($validated);
+        return redirect()->route('clients.index')->with('success', 'Cliente actualizado con éxito.');
+    }
+
+    public function destroy(Client $client)
+    {
+        $client->delete();
+        return redirect()->route('clients.index')->with('success', 'Cliente eliminado con éxito.');
+    }
+}
+```
+
+**OrderController.php**
+
+```php
+class OrderController extends Controller
+{
+    public function index()
+    {
+        $orders = Order::with('client')->get(); // Eager loading
+        return view('orders.index', compact('orders'));
+    }
+
+    public function create()
+    {
+        $clients = Client::all();
+        return view('orders.create', compact('clients'));
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'numero_pedido' => 'required|unique:orders',
+            'fecha' => 'required|date',
+            'estado' => 'required|in:pendiente,enviado,entregado,cancelado',
+            'total' => 'required|numeric|min:0',
+        ]);
+
+        Order::create($validated);
+        return redirect()->route('orders.index')->with('success', 'Pedido registrado.');
+    }
+
+    public function edit(Order $order)
+    {
+        $clients = Client::all();
+        return view('orders.edit', compact('order', 'clients'));
+    }
+
+    public function update(Request $request, Order $order)
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'numero_pedido' => 'required|unique:orders,numero_pedido,' . $order->id,
+            'fecha' => 'required|date',
+            'estado' => 'required|in:pendiente,enviado,entregado,cancelado',
+            'total' => 'required|numeric|min:0',
+        ]);
+
+        $order->update($validated);
+        return redirect()->route('orders.index')->with('success', 'Pedido actualizado con éxito.');
+    }
+
+    public function destroy(Order $order)
+    {
+        $order->delete();
+        return redirect()->route('orders.index')->with('success', 'Pedido eliminado con éxito.');
+    }
+}
+```
+
+### Métodos CRUD del Controlador
+
+| Método          | HTTP   | Ruta               | Descripción      |
+| ---------------- | ------ | ------------------ | ----------------- |
+| `index()`      | GET    | /clients           | Listar todos      |
+| `create()`     | GET    | /clients/create    | Formulario crear  |
+| `store()`      | POST   | /clients           | Guardar nuevo     |
+| `show($id)`    | GET    | /clients/{id}      | Ver detalle       |
+| `edit($id)`    | GET    | /clients/{id}/edit | Formulario editar |
+| `update()`     | PUT    | /clients/{id}      | Actualizar        |
+| `destroy($id)` | DELETE | /clients/{id}      | Eliminar          |
+
+### Rutas (routes/web.php)
+
+```php
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\OrderController;
+
+Route::get('/', fn() => redirect()->route('clients.index'));
+
+Route::resource('clients', ClientController::class);
+Route::resource('orders', OrderController::class);
+```
+
+`Route::resource()` genera automáticamente las 7 rutas CRUD.
+
+### Sintaxis Blade (Vistas)
+
+```blade
+{{-- Extender layout --}}
+@extends('layouts.app')
+
+@section('content')
+    {{-- Mostrar variables --}}
+    {{ $variable }}
+
+    {{-- Bucles --}}
+    @foreach($items as $item)
+        {{ $item->nombre }}
+    @endforeach
+
+    {{-- Condicionales --}}
+    @if($condicion)
+        ...
+    @endif
+
+    {{-- Formularios --}}
+    <form action="{{ route('clients.store') }}" method="POST">
+        @csrf
+        @method('PUT') {{-- Para update/delete --}}
+    </form>
+
+    {{-- Errores de validación --}}
+    @error('campo')
+        <span>{{ $message }}</span>
+    @enderror
+@endsection
 ```
 
 ---
 
-## Estructura de archivos creados
+## Comandos Artisan
 
-Tras ejecutar los comandos del día 1, se generaron los siguientes archivos:
+### Crear componentes
 
+```shell
+php artisan make:model Nombre -mcrf     # Modelo + Migración + Controlador + Factory
+php artisan make:controller Nombre      # Solo controlador
+php artisan make:migration create_x     # Solo migración
+php artisan make:factory Nombre         # Solo factory
+php artisan make:seeder Nombre          # Solo seeder
 ```
-app/
-├── Http/
-│   └── Controllers/
-│       ├── ClientController.php    # Controlador CRUD para clientes
-│       └── OrderController.php     # Controlador CRUD para pedidos
-└── Models/
-    ├── Client.php                  # Modelo de Cliente
-    └── Order.php                   # Modelo de Pedido
 
-database/
-└── migrations/
-    ├── 2026_01_25_193533_create_clients_table.php
-    └── 2026_01_25_193546_create_orders_table.php
+### Base de datos
+
+```shell
+php artisan migrate                     # Ejecutar migraciones
+php artisan migrate:fresh               # Borrar todo y recrear
+php artisan migrate:fresh --seed        # Recrear + poblar datos
+php artisan migrate:status              # Ver estado
+php artisan db:seed                     # Solo poblar datos
 ```
+
+### Servidor y depuración
+
+```shell
+php artisan serve                       # Iniciar servidor (http://127.0.0.1:8000)
+php artisan route:list                  # Ver todas las rutas
+php artisan cache:clear                 # Limpiar caché
+```
+
+### Flujo completo para iniciar
+
+```shell
+php artisan migrate:fresh --seed        # Crear BD + datos
+php artisan serve                       # Iniciar servidor
+```
+
+> ⚠️ `php artisan serve` **solo inicia el servidor**, no crea tablas ni datos. Ejecuta primero `migrate` y `db:seed`.
+
+---
+
+## Tecnologías
+
+- **Laravel 11** - Framework PHP
+- **SQLite** - Base de datos
+- **Blade** - Motor de plantillas
